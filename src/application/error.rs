@@ -14,4 +14,7 @@ pub enum ApplicationError {
 
     #[error("Error al aplicar parche en '{file}': {reason}")]
     PatchFailed { file: PathBuf, reason: String },
+
+    #[error("Error al renderizar plantilla: {0}")]
+    TemplateRender(String),
 }

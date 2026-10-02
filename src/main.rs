@@ -27,6 +27,22 @@ fn main() -> anyhow::Result<()> {
 
             println!("✨ ¡Proyecto Django '{}' creado exitosamente!", spec.name);
         }
+        Commands::Axum(args) => {
+            let spec = domain::AxumSpec::new(args.name, args.db, args.docker, args.auth)
+                .context("Parámetros del proyecto Axum inválidos")?;
+
+            let runner = StdProcessRunner;
+            let fs = StdFileSystem;
+            let renderer = infrastructure::TeraTemplateRenderer::new()
+                .context("Error al inicializar motor de plantillas")?;
+
+            println!("🔨 Creando proyecto Axum '{}'...", spec.name);
+
+            application::generate_axum(&spec, &runner, &fs, &renderer)
+                .context("Error durante la generación del proyecto Axum")?;
+
+            println!("✨ ¡Proyecto Axum '{}' creado exitosamente!", spec.name);
+        }
     }
 
     Ok(())

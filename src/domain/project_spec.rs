@@ -40,6 +40,63 @@ impl DjangoSpec {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DbOption {
+    Postgres,
+    Sqlite,
+}
+
+impl std::str::FromStr for DbOption {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "postgres" => Ok(DbOption::Postgres),
+            "sqlite" => Ok(DbOption::Sqlite),
+            _ => Err(format!("Base de datos no soportada: {}", s)),
+        }
+    }
+}
+
+impl std::fmt::Display for DbOption {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DbOption::Postgres => write!(f, "postgres"),
+            DbOption::Sqlite => write!(f, "sqlite"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AxumSpec {
+    pub name: String,
+    pub db: DbOption,
+    pub docker: bool,
+    pub auth: bool,
+}
+
+impl AxumSpec {
+    pub fn new(
+        name: impl Into<String>,
+        db: DbOption,
+        docker: bool,
+        auth: bool,
+    ) -> Result<Self, DomainError> {
+        let name = name.into();
+
+        if name.trim().is_empty() {
+            return Err(DomainError::ProjectName(name));
+        }
+
+        Ok(Self {
+            name,
+            db,
+            docker,
+            auth,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -65,5 +122,22 @@ mod tests {
     fn test_invalid_app_name() {
         let spec = DjangoSpec::new("demo", "6.1.1", "   ", false);
         assert_eq!(spec, Err(DomainError::AppName("   ".into())));
+    }
+
+    #[test]
+    fn test_valid_axum_spec() {
+        let spec = AxumSpec::new("mi_api", DbOption::Postgres, true, false);
+        assert!(spec.is_ok());
+        let spec = spec.unwrap();
+        assert_eq!(spec.name, "mi_api");
+        assert_eq!(spec.db, DbOption::Postgres);
+        assert!(spec.docker);
+        assert!(!spec.auth);
+    }
+
+    #[test]
+    fn test_invalid_axum_project_name() {
+        let spec = AxumSpec::new("   ", DbOption::Sqlite, false, false);
+        assert_eq!(spec, Err(DomainError::ProjectName("   ".into())));
     }
 }

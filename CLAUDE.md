@@ -2,7 +2,8 @@
 
 ## Qué es este proyecto
 
-`forja` es un CLI en Rust que genera proyectos desde cero ejecutando las herramientas oficiales de cada stack y aplicando la estructura que prefiero. Generadores actuales: **Django con uv** y **Axum (hexagonal)**. Los siguientes (Angular, NestJS, Go hexagonal) se agregan como nuevos subcomandos.
+`forja` es un CLI en Rust que genera proyectos desde cero ejecutando las herramientas oficiales de cada stack y aplicando la estructura que prefiero. Generadores actuales: **Django con uv**, **Axum (hexagonal)** y **Go (hexagonal)**. Los siguientes (Angular, NestJS) se agregan como nuevos subcomandos.
+
 
 ## Stack
 
@@ -20,14 +21,16 @@ src/
 ├── cli/                     # adaptador de entrada (clap)
 │   ├── mod.rs
 │   ├── django.rs
-│   └── axum.rs
+│   ├── axum.rs
+│   └── go_hex.rs
 ├── domain/                  # sin dependencias externas
-│   ├── project_spec.rs      # DjangoSpec y AxumSpec
+│   ├── project_spec.rs      # DjangoSpec, AxumSpec, GoHexSpec
 │   └── error.rs
 ├── application/
 │   ├── ports.rs             # traits CommandRunner, FileSystem y TemplateRenderer
 │   ├── generate_django.rs   # caso de uso
-│   └── generate_axum.rs     # caso de uso
+│   ├── generate_axum.rs     # caso de uso
+│   └── generate_go_hex.rs   # caso de uso
 └── infrastructure/          # adaptadores de salida
     ├── process_runner.rs    # std::process::Command
     ├── fs.rs                # std::fs
@@ -35,7 +38,9 @@ src/
     └── settings_patcher.rs  # edita settings.py y apps.py
 
 templates/
-└── axum/                    # plantillas (.tera) del proyecto generado
+├── axum/                    # plantillas (.tera) del proyecto Axum
+└── go-hex/                  # plantillas (.tera) del proyecto Go Hexagonal
+
 ```
 
 Reglas:
@@ -172,6 +177,55 @@ Testing:
 - Integración con `tower::ServiceExt`: registro → login → `/me` → refresh → reutilizar el refresh viejo (debe fallar y revocar la familia) → `/admin/ping` con rol `user` (403).
 - Cada test de plantilla verifica que, sin `--auth`, no se genere ningún archivo de auth.
 
+## Comando: `forja go-hex <nombre>`
+
+Flags:
+- `--module <nombre>` (default igual al nombre del proyecto)
+- `--transport <http|grpc|both>` (default `http`)
+- `--db <postgres|sqlite>` (default `postgres`)
+- `--docker` genera `Dockerfile` y `docker-compose.yml` (por defecto no)
+- `--auth` reservado para fase posterior (JWT); por ahora no hace nada
+
+Pasos, en orden:
+
+1. Validar que `go` esté instalado y disponible en el `PATH`.
+2. `go mod init <módulo>`
+3. Renderizar plantillas (estructura hexagonal y módulo `user` de ejemplo)
+4. Si `--transport grpc` o `both`: renderizar plantillas de `api/proto/` y adaptador `grpcapi`
+5. Si `--docker`: renderizar Dockerfile y compose
+6. `go get` de las dependencias requeridas (driver BD de acuerdo a `--db`, `google.golang.org/grpc` si aplica)
+7. `go mod tidy`
+8. `go build ./...` y `go vet ./...` para validar que el proyecto generado compila y pasa análisis estático
+
+Estructura del proyecto generado:
+
+```
+mi_servicio/
+├── cmd/api/main.go              # único lugar de wiring
+├── internal/
+│   ├── domain/user/
+│   ├── application/user/        # ports.go + service.go
+│   ├── adapters/
+│   │   ├── inbound/httpapi/     # y grpcapi/ si aplica
+│   │   └── outbound/postgres/
+│   └── platform/{config,logger}/
+├── api/proto/                   # solo con gRPC
+├── migrations/
+└── Makefile
+```
+
+Reglas del proyecto generado:
+- Puertos definidos en `application`, del lado del consumidor y de interfaz reducida/enfocada.
+- Uso prioritario de la biblioteca estándar Go: `net/http` con `ServeMux`, `log/slog` para logs estructurados y `signal.NotifyContext` para graceful shutdown.
+- Errores de dominio definidos como sentinelas (`ErrUserNotFound`).
+- Cada adaptador mapea los errores con `errors.Is` a códigos HTTP o gRPC.
+- Código encapsulado dentro de `internal/` para evitar importaciones no autorizadas desde fuera del módulo.
+
+Testing:
+- Los tests de `generate_go_hex` usan fakes de `CommandRunner`, `FileSystem` y `TemplateRenderer`.
+- Un test `#[ignore]` genera un proyecto real y ejecuta `go build ./...` y `go vet ./...`.
+
+
 ## Convenciones
 
 - Código e identificadores en inglés; mensajes al usuario y docs en español.
@@ -185,20 +239,22 @@ Testing:
 ```bash
 cargo build
 cargo test
-cargo test -- --ignored   # integración real (requiere uv)
+cargo test -- --ignored   # integración real (requiere uv/go)
 cargo run -- django demo --app core
 cargo run -- axum demo_api --db postgres
+cargo run -- go-hex demo_service --module github.com/user/demo_service --transport both
 ```
 
 ## Cómo agregar un generador nuevo
 
-1. Spec en `domain/` (por ejemplo `AxumSpec`).
+1. Spec en `domain/` (por ejemplo `GoHexSpec`).
 2. Caso de uso en `application/generate_<stack>.rs` usando los puertos existentes.
 3. Subcomando en `cli/<stack>.rs`.
 4. Tests con fakes y un test de integración `#[ignore]`.
 
 ## Fuera de alcance por ahora
 
+- `--auth` (JWT) para Go Hexagonal: fase posterior
 - OAuth/OIDC, RS256, 2FA y recuperación de contraseña: fases posteriores
 - Configuración por archivo (`forja.toml`)
-- Nginx y CI (Docker solo existe como `forja axum --docker`)
+- Nginx y CI (Docker solo existe como `forja <stack> --docker`)

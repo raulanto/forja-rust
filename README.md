@@ -8,11 +8,14 @@ Generadores disponibles:
 |---|---|
 | `forja django <nombre>` | Proyecto Django con uv y estructura `apps/` |
 | `forja axum <nombre>` | API en Rust (Axum) con arquitectura hexagonal |
+| `forja go-hex <nombre>` | Servicio en Go con arquitectura hexagonal (HTTP / gRPC) |
 
 ## Requisitos
 
 - [Rust](https://rustup.rs) (stable)
-- [uv](https://docs.astral.sh/uv/) instalado y en el `PATH`
+- [uv](https://docs.astral.sh/uv/) instalado y en el `PATH` (para `forja django`)
+- [Go](https://go.dev/) (1.22+) instalado y en el `PATH` (para `forja go-hex`)
+
 
 ## Instalación
 
@@ -130,6 +133,42 @@ Agrega registro, login, refresh con rotación, logout, ruta protegida (`/me`) y 
 
 Seguridad por defecto: contraseñas con argon2id, access token de 15 min, refresh token opaco guardado como hash y rotado en cada uso (con detección de reutilización), y `JWT_SECRET` aleatorio generado en `.env`.
 
+## Qué hace `forja go-hex`
+
+```bash
+forja go-hex mi_servicio
+```
+
+Opciones:
+
+| Flag | Default | Descripción |
+|---|---|---|
+| `--module <nombre>` | igual al nombre | Nombre del módulo para `go mod init` |
+| `--transport <http\|grpc\|both>` | `http` | Transportes habilitados |
+| `--db <postgres\|sqlite>` | `postgres` | Driver de base de datos |
+| `--docker` | desactivado | Genera `Dockerfile` y `docker-compose.yml` |
+
+Pasos: comprobación de `go` en `PATH`, `go mod init`, renderizado de plantillas, `go get`, `go mod tidy`, `go build ./...` y `go vet ./...`.
+
+Resultado:
+
+```
+mi_servicio/
+├── cmd/api/main.go              # único lugar de wiring
+├── internal/
+│   ├── domain/user/
+│   ├── application/user/        # ports.go + service.go
+│   ├── adapters/
+│   │   ├── inbound/httpapi/     # y grpcapi/ si aplica
+│   │   └── outbound/postgres/
+│   └── platform/{config,logger}/
+├── api/proto/                   # solo con gRPC
+├── migrations/
+└── Makefile
+```
+
+Usa la biblioteca estándar Go siempre que es posible (`net/http` con `ServeMux`, `log/slog` y `signal.NotifyContext`).
+
 ## Arquitectura
 
 Hexagonal: `domain` → `application` (casos de uso y puertos) → `infrastructure` (procesos, filesystem, parches de texto) → `cli` (clap). Detalles en [CLAUDE.md](CLAUDE.md).
@@ -138,7 +177,7 @@ Hexagonal: `domain` → `application` (casos de uso y puertos) → `infrastructu
 
 ```bash
 cargo test
-cargo test -- --ignored   # integración real, requiere uv
+cargo test -- --ignored   # integración real, requiere uv/go
 cargo fmt && cargo clippy -- -D warnings
 ```
 
@@ -147,8 +186,8 @@ cargo fmt && cargo clippy -- -D warnings
 - [x] `forja django`
 - [x] `forja axum`
 - [x] `forja axum --auth`
+- [x] `forja go-hex`
 - [ ] `forja nest`
-- [ ] `forja go-hex`
 - [ ] Nginx y GitHub Actions como opciones
 
 ## Licencia

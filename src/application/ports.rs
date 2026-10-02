@@ -13,3 +13,11 @@ pub trait FileSystem {
     #[allow(dead_code)]
     fn exists(&self, path: &Path) -> bool;
 }
+
+pub trait TemplateRenderer {
+    fn render(
+        &self,
+        template_name: &str,
+        context: &tera::Context,
+    ) -> Result<String, ApplicationError>;
+}

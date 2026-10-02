@@ -1,5 +1,7 @@
+pub mod axum;
 pub mod django;
 
+use axum::AxumArgs;
 use clap::{Parser, Subcommand};
 use django::DjangoArgs;
 
@@ -20,4 +22,7 @@ pub struct Cli {
 pub enum Commands {
     /// Generar un proyecto Django con uv
     Django(DjangoArgs),
+
+    /// Generar una API en Rust con Axum y arquitectura hexagonal
+    Axum(AxumArgs),
 }
