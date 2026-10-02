@@ -7,6 +7,7 @@ Generadores disponibles:
 | Comando | Descripción |
 |---|---|
 | `forja django <nombre>` | Proyecto Django con uv y estructura `apps/` |
+| `forja axum <nombre>` | API en Rust (Axum) con arquitectura hexagonal |
 
 ## Requisitos
 
@@ -73,6 +74,43 @@ mi_proyecto/
     └── core/
 ```
 
+## Qué hace `forja axum`
+
+```bash
+forja axum mi_api
+```
+
+Opciones:
+
+| Flag | Default | Descripción |
+|---|---|---|
+| `--db <postgres\|sqlite>` | `postgres` | Base de datos para `sqlx` |
+| `--docker` | desactivado | Genera `Dockerfile` y `docker-compose.yml` |
+| `--auth` | desactivado | Reservado para JWT (siguiente fase) |
+
+Pasos: `cargo new`, `cargo add` de dependencias, renderizado de plantillas y `cargo check` final para confirmar que compila.
+
+Resultado:
+
+```
+mi_api/
+├── Cargo.toml
+├── .env.example
+├── migrations/
+├── src/
+│   ├── main.rs, lib.rs, config.rs
+│   ├── domain/user/
+│   ├── application/user/
+│   ├── infrastructure/persistence/
+│   └── presentation/http/
+│       ├── router.rs, state.rs, error.rs
+│       ├── dto/
+│       └── handlers/
+└── tests/api_health.rs
+```
+
+Incluye un módulo `user` de ejemplo que recorre todas las capas, un endpoint `/health`, tracing y graceful shutdown.
+
 ## Arquitectura
 
 Hexagonal: `domain` → `application` (casos de uso y puertos) → `infrastructure` (procesos, filesystem, parches de texto) → `cli` (clap). Detalles en [CLAUDE.md](CLAUDE.md).
@@ -87,11 +125,12 @@ cargo fmt && cargo clippy -- -D warnings
 
 ## Roadmap
 
-- [ ] `forja django` (en progreso)
-- [ ] `forja axum`
+- [x] `forja django`
+- [ ] `forja axum` (en progreso)
+- [ ] `forja axum --auth` (JWT)
 - [ ] `forja nest`
 - [ ] `forja go-hex`
-- [ ] Opciones de Docker, Nginx y GitHub Actions
+- [ ] Nginx y GitHub Actions como opciones
 
 ## Licencia
 
