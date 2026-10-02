@@ -60,6 +60,20 @@ pub fn generate_axum(
     let main_content = renderer.render("main.rs.tera", &ctx)?;
     fs.write_file(&src_dir.join("main.rs"), &main_content)?;
 
+    // Renderizar archivos de auth si spec.auth está activado
+    if spec.auth {
+        let auth_domain_dir = src_dir.join("domain").join("auth");
+        fs.create_dir_all(&auth_domain_dir)?;
+        let auth_app_dir = src_dir.join("application").join("auth");
+        fs.create_dir_all(&auth_app_dir)?;
+
+        let role_content = renderer.render("role.rs.tera", &ctx)?;
+        fs.write_file(&auth_domain_dir.join("role.rs"), &role_content)?;
+
+        let auth_ports_content = renderer.render("auth_ports.rs.tera", &ctx)?;
+        fs.write_file(&auth_app_dir.join("ports.rs"), &auth_ports_content)?;
+    }
+
     // 4. Si --docker: renderizar Dockerfile y compose
     if spec.docker {
         let dockerfile = renderer.render("Dockerfile.tera", &ctx)?;
@@ -170,5 +184,26 @@ mod tests {
         assert!(files.iter().any(|(p, _)| p.ends_with("main.rs")));
         assert!(files.iter().any(|(p, _)| p.ends_with("Dockerfile")));
         assert!(files.iter().any(|(p, _)| p.ends_with("docker-compose.yml")));
+    }
+
+    #[test]
+    fn test_generate_axum_with_auth_flow() {
+        let spec = AxumSpec::new("demo_auth_api", DbOption::Postgres, false, true).unwrap();
+        let runner = FakeRunner::new();
+        let fs = FakeFs::new();
+        let renderer = FakeRenderer;
+
+        let result = generate_axum(&spec, &runner, &fs, &renderer);
+        assert!(result.is_ok());
+
+        let calls = runner.calls.borrow();
+        assert_eq!(calls[0], "cargo new demo_auth_api");
+        assert!(calls[1].starts_with("cargo add axum tokio"));
+        assert!(calls[2].starts_with("cargo add jsonwebtoken argon2"));
+        assert_eq!(calls[3], "cargo check");
+
+        let files = fs.files.borrow();
+        assert!(files.iter().any(|(p, _)| p.ends_with("role.rs")));
+        assert!(files.iter().any(|(p, _)| p.ends_with("ports.rs")));
     }
 }

@@ -53,6 +53,25 @@ services:
       - DATABASE_URL={{ db }}://user:pass@localhost/{{ project_name }}
 "#,
             ),
+            (
+                "role.rs.tera",
+                r#"#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum Role {
+    Admin,
+    User,
+}
+"#,
+            ),
+            (
+                "auth_ports.rs.tera",
+                r#"use async_trait::async_trait;
+
+pub trait PasswordHasher {
+    fn hash_password(&self, password: &str) -> Result<String, String>;
+    fn verify_password(&self, password: &str, hash: &str) -> Result<bool, String>;
+}
+"#,
+            ),
         ])
         .map_err(|e| ApplicationError::TemplateRender(e.to_string()))?;
 
