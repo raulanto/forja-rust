@@ -86,7 +86,7 @@ Opciones:
 |---|---|---|
 | `--db <postgres\|sqlite>` | `postgres` | Base de datos para `sqlx` |
 | `--docker` | desactivado | Genera `Dockerfile` y `docker-compose.yml` |
-| `--auth` | desactivado | Reservado para JWT (siguiente fase) |
+| `--auth` | desactivado | Autenticación JWT con refresh tokens y roles |
 
 Pasos: `cargo new`, `cargo add` de dependencias, renderizado de plantillas y `cargo check` final para confirmar que compila.
 
@@ -111,6 +111,25 @@ mi_api/
 
 Incluye un módulo `user` de ejemplo que recorre todas las capas, un endpoint `/health`, tracing y graceful shutdown.
 
+### Con `--auth`
+
+```bash
+forja axum mi_api --auth
+```
+
+Agrega registro, login, refresh con rotación, logout, ruta protegida (`/me`) y guard por rol (`/admin/ping`).
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/auth/register` | Crea usuario |
+| POST | `/auth/login` | Access token + refresh token |
+| POST | `/auth/refresh` | Rota el refresh token |
+| POST | `/auth/logout` | Revoca el refresh token |
+| GET | `/me` | Usuario autenticado |
+| GET | `/admin/ping` | Solo rol `admin` |
+
+Seguridad por defecto: contraseñas con argon2id, access token de 15 min, refresh token opaco guardado como hash y rotado en cada uso (con detección de reutilización), y `JWT_SECRET` aleatorio generado en `.env`.
+
 ## Arquitectura
 
 Hexagonal: `domain` → `application` (casos de uso y puertos) → `infrastructure` (procesos, filesystem, parches de texto) → `cli` (clap). Detalles en [CLAUDE.md](CLAUDE.md).
@@ -126,8 +145,8 @@ cargo fmt && cargo clippy -- -D warnings
 ## Roadmap
 
 - [x] `forja django`
-- [ ] `forja axum` (en progreso)
-- [ ] `forja axum --auth` (JWT)
+- [x] `forja axum`
+- [x] `forja axum --auth`
 - [ ] `forja nest`
 - [ ] `forja go-hex`
 - [ ] Nginx y GitHub Actions como opciones

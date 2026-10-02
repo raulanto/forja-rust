@@ -73,15 +73,16 @@ Parches de texto:
 Flags:
 - `--db <postgres|sqlite>` (default `postgres`)
 - `--docker` genera `Dockerfile` y `docker-compose.yml` (por defecto no)
-- `--auth` reservado para la siguiente fase (JWT); por ahora no hace nada
+- `--auth` añade el módulo de autenticación JWT (sección «Fase auth»)
 
 Pasos, en orden:
 
 1. `cargo new <nombre>`
 2. `cargo add` de las dependencias: `axum`, `tokio` (full), `tower-http` (trace, cors), `serde` (derive), `sqlx` (según `--db`), `tracing`, `tracing-subscriber`, `thiserror`, `anyhow`, `dotenvy`, `uuid`
 3. Renderizar plantillas (estructura hexagonal y módulo `user` de ejemplo)
-4. Si `--docker`: renderizar Dockerfile y compose
-5. `cargo check` para validar que el proyecto generado compila
+4. Si `--auth`: `cargo add` de `jsonwebtoken`, `argon2`, `rand`, `sha2`, `time`; renderizar plantillas y migraciones de auth; generar `.env` con `JWT_SECRET` aleatorio
+5. Si `--docker`: renderizar Dockerfile y compose
+6. `cargo check` para validar que el proyecto generado compila
 
 Estructura del proyecto generado:
 
@@ -107,6 +108,69 @@ Testing:
 - Los tests de `generate_axum` usan fakes de `CommandRunner`, `FileSystem` y `TemplateRenderer`, y verifican qué archivos y comandos se piden.
 - Las plantillas se validan con tests de snapshot del renderizado.
 - Un test `#[ignore]` genera un proyecto real y ejecuta `cargo check` sobre él.
+
+## Fase auth: `forja axum <nombre> --auth`
+
+Agrega autenticación JWT con refresh tokens y roles al proyecto generado. Requiere el módulo `user` (siempre se genera).
+
+Endpoints:
+
+| Método | Ruta | Descripción |
+|---|---|---|
+| POST | `/auth/register` | Crea usuario (rol `user`) |
+| POST | `/auth/login` | Devuelve access token y refresh token |
+| POST | `/auth/refresh` | Rota el refresh token y emite un nuevo access token |
+| POST | `/auth/logout` | Revoca el refresh token |
+| GET | `/me` | Usuario autenticado (ruta protegida de ejemplo) |
+| GET | `/admin/ping` | Ruta solo para rol `admin` (ejemplo de guard por rol) |
+
+Capas añadidas al proyecto generado:
+
+```
+src/
+├── domain/auth/
+│   ├── role.rs              # enum Role { Admin, User }
+│   ├── refresh_token.rs     # entidad RefreshToken (familia, expiración, revocado)
+│   └── error.rs             # AuthError
+├── application/auth/
+│   ├── ports.rs             # PasswordHasher, TokenService, RefreshTokenRepository
+│   ├── register.rs
+│   ├── login.rs
+│   ├── refresh.rs
+│   └── logout.rs
+├── infrastructure/
+│   ├── security/
+│   │   ├── argon2_hasher.rs # impl PasswordHasher (argon2id)
+│   │   └── jwt_service.rs   # impl TokenService (jsonwebtoken, HS256)
+│   └── persistence/
+│       └── refresh_token_repo.rs
+└── presentation/http/
+    ├── extractors/
+    │   ├── auth_user.rs     # AuthUser: FromRequestParts, valida el Bearer
+    │   └── require_role.rs  # RequireRole<R>: guard por rol
+    ├── dto/auth.rs
+    └── handlers/auth.rs
+migrations/                  # users += password_hash, role; tabla refresh_tokens
+```
+
+Decisiones de seguridad (no negociables):
+- Contraseñas con **argon2id**; nunca se loguean ni se devuelven.
+- Access token de vida corta (default 15 min); claims mínimos: `sub`, `role`, `iat`, `exp`, `jti`.
+- Refresh token **opaco** (32 bytes aleatorios), guardado como hash SHA-256 en BD, nunca en claro.
+- **Rotación** en cada uso. Si se reutiliza un refresh ya rotado, se revoca toda su familia.
+- Login con mensaje de error genérico, y hash de relleno cuando el usuario no existe, para evitar enumeración por mensaje o por tiempo.
+- `JWT_SECRET` se valida al arrancar (mínimo 32 bytes); si falta o es corto, la app no inicia.
+- Config en `.env`: `JWT_SECRET`, `ACCESS_TOKEN_TTL_MINUTES`, `REFRESH_TOKEN_TTL_DAYS`. El `.env` generado queda en `.gitignore`; `.env.example` solo lleva placeholders.
+
+Reglas de arquitectura:
+- `application/auth` solo conoce los puertos; no importa `jsonwebtoken` ni `argon2`.
+- Los extractores de `presentation` dependen del puerto `TokenService`, no de la implementación.
+- Cambiar HS256 por RS256 debe implicar solo un adaptador nuevo en `infrastructure/security`.
+
+Testing:
+- Casos de uso con fakes de `PasswordHasher`, `TokenService` y `RefreshTokenRepository`.
+- Integración con `tower::ServiceExt`: registro → login → `/me` → refresh → reutilizar el refresh viejo (debe fallar y revocar la familia) → `/admin/ping` con rol `user` (403).
+- Cada test de plantilla verifica que, sin `--auth`, no se genere ningún archivo de auth.
 
 ## Convenciones
 
@@ -135,6 +199,6 @@ cargo run -- axum demo_api --db postgres
 
 ## Fuera de alcance por ahora
 
-- `--auth` (JWT) para Axum: siguiente fase
+- OAuth/OIDC, RS256, 2FA y recuperación de contraseña: fases posteriores
 - Configuración por archivo (`forja.toml`)
 - Nginx y CI (Docker solo existe como `forja axum --docker`)
