@@ -18,7 +18,6 @@ pub fn generate_axum(
     // 2. cargo add de dependencias básicas
     let mut deps = vec![
         "axum",
-        "tokio",
         "tower-http",
         "serde",
         "tracing",
@@ -38,6 +37,20 @@ pub fn generate_axum(
     add_args.extend(deps);
 
     runner.run("cargo", &add_args, Some(project_dir))?;
+
+    // tokio requiere la característica 'full' o 'rt-multi-thread' y 'macros' para #[tokio::main]
+    runner.run(
+        "cargo",
+        &["add", "tokio", "--features", "full"],
+        Some(project_dir),
+    )?;
+
+    // tracing-subscriber requiere la característica 'env-filter' para EnvFilter
+    runner.run(
+        "cargo",
+        &["add", "tracing-subscriber", "--features", "env-filter"],
+        Some(project_dir),
+    )?;
 
     // Si --auth, agregar dependencias adicionales
     if spec.auth {
@@ -177,8 +190,13 @@ mod tests {
 
         let calls = runner.calls.borrow();
         assert_eq!(calls[0], "cargo new demo_api");
-        assert!(calls[1].starts_with("cargo add axum tokio"));
-        assert_eq!(calls[2], "cargo check");
+        assert!(calls[1].starts_with("cargo add axum tower-http"));
+        assert_eq!(calls[2], "cargo add tokio --features full");
+        assert_eq!(
+            calls[3],
+            "cargo add tracing-subscriber --features env-filter"
+        );
+        assert_eq!(calls[4], "cargo check");
 
         let files = fs.files.borrow();
         assert!(files.iter().any(|(p, _)| p.ends_with("main.rs")));
@@ -198,9 +216,14 @@ mod tests {
 
         let calls = runner.calls.borrow();
         assert_eq!(calls[0], "cargo new demo_auth_api");
-        assert!(calls[1].starts_with("cargo add axum tokio"));
-        assert!(calls[2].starts_with("cargo add jsonwebtoken argon2"));
-        assert_eq!(calls[3], "cargo check");
+        assert!(calls[1].starts_with("cargo add axum tower-http"));
+        assert_eq!(calls[2], "cargo add tokio --features full");
+        assert_eq!(
+            calls[3],
+            "cargo add tracing-subscriber --features env-filter"
+        );
+        assert!(calls[4].starts_with("cargo add jsonwebtoken argon2"));
+        assert_eq!(calls[5], "cargo check");
 
         let files = fs.files.borrow();
         assert!(files.iter().any(|(p, _)| p.ends_with("role.rs")));

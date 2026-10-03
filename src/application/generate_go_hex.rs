@@ -15,6 +15,9 @@ pub fn generate_go_hex(
     // 1. Comprobar disponibilidad de go
     runner.run("go", &["version"], None)?;
 
+    // Crear el directorio del proyecto
+    fs.create_dir_all(project_dir)?;
+
     // 2. go mod init <módulo>
     runner.run("go", &["mod", "init", &spec.module], Some(project_dir))?;
 

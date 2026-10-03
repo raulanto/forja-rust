@@ -90,10 +90,11 @@ func main() {
 
 	slog.Info("Starting {{ project_name }}...", "module", "{{ module_name }}")
 	<-ctx.Done()
-	fmt.println("Shutdown complete")
+	fmt.Println("Shutdown complete")
 }
 "#,
             ),
+
             (
                 "go_Dockerfile.tera",
                 r#"FROM golang:1.22-alpine AS builder
