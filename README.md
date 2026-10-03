@@ -23,6 +23,13 @@ git clone <repo> forja && cd forja
 cargo install --path .
 ```
 
+## Desinstalación
+
+```bash
+cargo uninstall forja
+```
+
+
 ## Uso
 
 ```bash
