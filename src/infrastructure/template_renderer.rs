@@ -113,6 +113,7 @@ CMD ["./server"]
                 "fastapi_main.py.tera",
                 r#"from fastapi import FastAPI
 
+
 def create_app() -> FastAPI:
     app = FastAPI(title="{{ project_name }}")
 
@@ -122,9 +123,11 @@ def create_app() -> FastAPI:
 
     return app
 
+
 app = create_app()
 "#,
             ),
+
             (
                 "fastapi_Dockerfile.tera",
                 r#"FROM python:3.12-slim
