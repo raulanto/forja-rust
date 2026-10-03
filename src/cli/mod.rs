@@ -1,9 +1,11 @@
 pub mod axum;
 pub mod django;
+pub mod go_hex;
 
 use axum::AxumArgs;
 use clap::{Parser, Subcommand};
 use django::DjangoArgs;
+use go_hex::GoHexArgs;
 
 #[derive(Parser, Debug)]
 #[command(
@@ -25,4 +27,7 @@ pub enum Commands {
 
     /// Generar una API en Rust con Axum y arquitectura hexagonal
     Axum(AxumArgs),
+
+    /// Generar un servicio en Go con arquitectura hexagonal
+    GoHex(GoHexArgs),
 }

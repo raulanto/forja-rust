@@ -8,14 +8,13 @@ Generadores disponibles:
 |---|---|
 | `forja django <nombre>` | Proyecto Django con uv y estructura `apps/` |
 | `forja axum <nombre>` | API en Rust (Axum) con arquitectura hexagonal |
-| `forja go-hex <nombre>` | Servicio en Go con arquitectura hexagonal (HTTP / gRPC) |
+| `forja go-hex <nombre>` | Servicio en Go con arquitectura hexagonal (HTTP y/o gRPC) |
+| `forja fastapi <nombre>` | API en Python (FastAPI) con arquitectura hexagonal y uv |
 
 ## Requisitos
 
 - [Rust](https://rustup.rs) (stable)
-- [uv](https://docs.astral.sh/uv/) instalado y en el `PATH` (para `forja django`)
-- [Go](https://go.dev/) (1.22+) instalado y en el `PATH` (para `forja go-hex`)
-
+- [uv](https://docs.astral.sh/uv/) instalado y en el `PATH`
 
 ## Instalación
 
@@ -136,38 +135,77 @@ Seguridad por defecto: contraseñas con argon2id, access token de 15 min, refres
 ## Qué hace `forja go-hex`
 
 ```bash
-forja go-hex mi_servicio
+forja go-hex mi_servicio --module github.com/usuario/mi_servicio
+```
+
+Requiere [Go](https://go.dev/dl/) en el `PATH`.
+
+Opciones:
+
+| Flag | Default | Descripción |
+|---|---|---|
+| `--module <ruta>` | `<nombre>` | Ruta del módulo de Go |
+| `--transport <http\|grpc\|both>` | `http` | Adaptador de entrada |
+| `--db <postgres\|sqlite>` | `postgres` | Adaptador de persistencia |
+| `--docker` | desactivado | Genera `Dockerfile` y `docker-compose.yml` |
+
+Pasos: `go mod init`, renderizado de plantillas, `go get`, `go mod tidy` y `go build ./... && go vet ./...` final para confirmar que compila.
+
+Resultado:
+
+```
+mi_servicio/
+├── cmd/api/main.go
+├── internal/
+│   ├── domain/user/
+│   ├── application/user/
+│   ├── adapters/
+│   │   ├── inbound/httpapi/   (y grpcapi/ si aplica)
+│   │   └── outbound/postgres/
+│   └── platform/{config,logger}/
+├── api/proto/                 (solo con gRPC)
+├── migrations/
+└── Makefile
+```
+
+Usa solo biblioteca estándar donde se puede (`net/http`, `log/slog`), incluye `/health`, graceful shutdown y un módulo `user` de ejemplo que recorre todas las capas.
+
+## Qué hace `forja fastapi`
+
+```bash
+forja fastapi mi_api
 ```
 
 Opciones:
 
 | Flag | Default | Descripción |
 |---|---|---|
-| `--module <nombre>` | igual al nombre | Nombre del módulo para `go mod init` |
-| `--transport <http\|grpc\|both>` | `http` | Transportes habilitados |
-| `--db <postgres\|sqlite>` | `postgres` | Driver de base de datos |
+| `--db <postgres\|sqlite>` | `postgres` | Base de datos (SQLAlchemy async + Alembic) |
 | `--docker` | desactivado | Genera `Dockerfile` y `docker-compose.yml` |
+| `--auth` | desactivado | Reservado para JWT (fase posterior) |
 
-Pasos: comprobación de `go` en `PATH`, `go mod init`, renderizado de plantillas, `go get`, `go mod tidy`, `go build ./...` y `go vet ./...`.
+Pasos: `uv init --package`, `uv add` de dependencias, renderizado de plantillas y validación final con `ruff` y `pytest`.
 
 Resultado:
 
 ```
-mi_servicio/
-├── cmd/api/main.go              # único lugar de wiring
-├── internal/
-│   ├── domain/user/
-│   ├── application/user/        # ports.go + service.go
-│   ├── adapters/
-│   │   ├── inbound/httpapi/     # y grpcapi/ si aplica
-│   │   └── outbound/postgres/
-│   └── platform/{config,logger}/
-├── api/proto/                   # solo con gRPC
+mi_api/
+├── pyproject.toml
+├── alembic.ini
 ├── migrations/
-└── Makefile
+├── src/mi_api/
+│   ├── main.py, config.py
+│   ├── domain/user/
+│   ├── application/user/
+│   ├── infrastructure/persistence/
+│   └── presentation/http/
+│       ├── router.py, dependencies.py, errors.py
+│       ├── schemas/
+│       └── routes/
+└── tests/{unit,integration}/
 ```
 
-Usa la biblioteca estándar Go siempre que es posible (`net/http` con `ServeMux`, `log/slog` y `signal.NotifyContext`).
+Dominio en Python puro, puertos como `Protocol`, Pydantic solo en la capa HTTP, SQLAlchemy 2.0 async, `/health` y un módulo `user` de ejemplo que recorre todas las capas. Configura `ruff` y `mypy --strict` desde el inicio.
 
 ## Arquitectura
 
@@ -177,17 +215,18 @@ Hexagonal: `domain` → `application` (casos de uso y puertos) → `infrastructu
 
 ```bash
 cargo test
-cargo test -- --ignored   # integración real, requiere uv/go
+cargo test -- --ignored   # integración real, requiere uv
 cargo fmt && cargo clippy -- -D warnings
 ```
 
 ## Roadmap
 
 - [x] `forja django`
-- [x] `forja axum`
+- [x] `forja axum` 
 - [x] `forja axum --auth`
-- [x] `forja go-hex`
 - [ ] `forja nest`
+- [x] `forja go-hex`
+- [] `forja fastapi`
 - [ ] Nginx y GitHub Actions como opciones
 
 ## Licencia

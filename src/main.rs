@@ -43,6 +43,32 @@ fn main() -> anyhow::Result<()> {
 
             println!("✨ ¡Proyecto Axum '{}' creado exitosamente!", spec.name);
         }
+        Commands::GoHex(args) => {
+            let spec = domain::GoHexSpec::new(
+                args.name,
+                args.module,
+                args.transport,
+                args.db,
+                args.docker,
+                args.auth,
+            )
+            .context("Parámetros del proyecto Go Hexagonal inválidos")?;
+
+            let runner = StdProcessRunner;
+            let fs = StdFileSystem;
+            let renderer = infrastructure::TeraTemplateRenderer::new()
+                .context("Error al inicializar motor de plantillas")?;
+
+            println!("🔨 Creando servicio Go Hexagonal '{}'...", spec.name);
+
+            application::generate_go_hex(&spec, &runner, &fs, &renderer)
+                .context("Error durante la generación del proyecto Go Hexagonal")?;
+
+            println!(
+                "✨ ¡Servicio Go Hexagonal '{}' creado exitosamente!",
+                spec.name
+            );
+        }
     }
 
     Ok(())

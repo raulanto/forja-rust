@@ -97,6 +97,77 @@ impl AxumSpec {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransportOption {
+    Http,
+    Grpc,
+    Both,
+}
+
+impl std::str::FromStr for TransportOption {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "http" => Ok(TransportOption::Http),
+            "grpc" => Ok(TransportOption::Grpc),
+            "both" => Ok(TransportOption::Both),
+            _ => Err(format!("Transporte no soportado: {}", s)),
+        }
+    }
+}
+
+impl std::fmt::Display for TransportOption {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TransportOption::Http => write!(f, "http"),
+            TransportOption::Grpc => write!(f, "grpc"),
+            TransportOption::Both => write!(f, "both"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GoHexSpec {
+    pub name: String,
+    pub module: String,
+    pub transport: TransportOption,
+    pub db: DbOption,
+    pub docker: bool,
+    pub auth: bool,
+}
+
+impl GoHexSpec {
+    pub fn new(
+        name: impl Into<String>,
+        module: Option<String>,
+        transport: TransportOption,
+        db: DbOption,
+        docker: bool,
+        auth: bool,
+    ) -> Result<Self, DomainError> {
+        let name = name.into();
+
+        if name.trim().is_empty() {
+            return Err(DomainError::ProjectName(name.clone()));
+        }
+
+        let module = match module {
+            Some(m) if !m.trim().is_empty() => m,
+            _ => name.clone(),
+        };
+
+        Ok(Self {
+            name,
+            module,
+            transport,
+            db,
+            docker,
+            auth,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -139,5 +210,37 @@ mod tests {
     fn test_invalid_axum_project_name() {
         let spec = AxumSpec::new("   ", DbOption::Sqlite, false, false);
         assert_eq!(spec, Err(DomainError::ProjectName("   ".into())));
+    }
+
+    #[test]
+    fn test_valid_go_hex_spec() {
+        let spec = GoHexSpec::new(
+            "mi_servicio",
+            Some("github.com/user/mi_servicio".into()),
+            TransportOption::Both,
+            DbOption::Postgres,
+            true,
+            false,
+        );
+        assert!(spec.is_ok());
+        let spec = spec.unwrap();
+        assert_eq!(spec.name, "mi_servicio");
+        assert_eq!(spec.module, "github.com/user/mi_servicio");
+        assert_eq!(spec.transport, TransportOption::Both);
+    }
+
+    #[test]
+    fn test_go_hex_spec_default_module() {
+        let spec = GoHexSpec::new(
+            "mi_servicio",
+            None,
+            TransportOption::Http,
+            DbOption::Sqlite,
+            false,
+            false,
+        );
+        assert!(spec.is_ok());
+        let spec = spec.unwrap();
+        assert_eq!(spec.module, "mi_servicio");
     }
 }

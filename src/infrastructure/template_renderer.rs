@@ -72,6 +72,43 @@ pub trait PasswordHasher {
 }
 "#,
             ),
+            (
+                "go_main.go.tera",
+                r#"package main
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"os"
+	"os/signal"
+)
+
+func main() {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer cancel()
+
+	slog.Info("Starting {{ project_name }}...", "module", "{{ module_name }}")
+	<-ctx.Done()
+	fmt.println("Shutdown complete")
+}
+"#,
+            ),
+            (
+                "go_Dockerfile.tera",
+                r#"FROM golang:1.22-alpine AS builder
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN go build -o server ./cmd/api
+
+FROM alpine:latest
+WORKDIR /app
+COPY --from=builder /app/server .
+CMD ["./server"]
+"#,
+            ),
         ])
         .map_err(|e| ApplicationError::TemplateRender(e.to_string()))?;
 
