@@ -1,10 +1,12 @@
 pub mod axum;
 pub mod django;
+pub mod fastapi;
 pub mod go_hex;
 
 use axum::AxumArgs;
 use clap::{Parser, Subcommand};
 use django::DjangoArgs;
+use fastapi::FastApiArgs;
 use go_hex::GoHexArgs;
 
 #[derive(Parser, Debug)]
@@ -30,4 +32,7 @@ pub enum Commands {
 
     /// Generar un servicio en Go con arquitectura hexagonal
     GoHex(GoHexArgs),
+
+    /// Generar una API en Python con FastAPI, arquitectura hexagonal y uv
+    FastApi(FastApiArgs),
 }

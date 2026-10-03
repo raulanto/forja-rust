@@ -109,6 +109,44 @@ COPY --from=builder /app/server .
 CMD ["./server"]
 "#,
             ),
+            (
+                "fastapi_main.py.tera",
+                r#"from fastapi import FastAPI
+
+def create_app() -> FastAPI:
+    app = FastAPI(title="{{ project_name }}")
+
+    @app.get("/health")
+    async def health():
+        return {"status": "ok"}
+
+    return app
+
+app = create_app()
+"#,
+            ),
+            (
+                "fastapi_Dockerfile.tera",
+                r#"FROM python:3.12-slim
+WORKDIR /app
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+COPY . .
+RUN uv sync --frozen
+CMD ["uv", "run", "fastapi", "run", "src/{{ package_name }}/main.py"]
+"#,
+            ),
+            (
+                "fastapi_docker_compose.yml.tera",
+                r#"version: '3.8'
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL={{ db }}://user:pass@localhost/{{ package_name }}
+"#,
+            ),
         ])
         .map_err(|e| ApplicationError::TemplateRender(e.to_string()))?;
 

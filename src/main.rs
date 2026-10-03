@@ -69,6 +69,22 @@ fn main() -> anyhow::Result<()> {
                 spec.name
             );
         }
+        Commands::FastApi(args) => {
+            let spec = domain::FastApiSpec::new(args.name, args.db, args.docker, args.auth)
+                .context("Parámetros del proyecto FastAPI inválidos")?;
+
+            let runner = StdProcessRunner;
+            let fs = StdFileSystem;
+            let renderer = infrastructure::TeraTemplateRenderer::new()
+                .context("Error al inicializar motor de plantillas")?;
+
+            println!("🔨 Creando API FastAPI '{}'...", spec.name);
+
+            application::generate_fastapi(&spec, &runner, &fs, &renderer)
+                .context("Error durante la generación del proyecto FastAPI")?;
+
+            println!("✨ ¡API FastAPI '{}' creada exitosamente!", spec.name);
+        }
     }
 
     Ok(())

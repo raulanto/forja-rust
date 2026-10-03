@@ -224,10 +224,11 @@ cargo fmt && cargo clippy -- -D warnings
 - [x] `forja django`
 - [x] `forja axum` 
 - [x] `forja axum --auth`
-- [ ] `forja nest`
 - [x] `forja go-hex`
-- [] `forja fastapi`
+- [x] `forja fastapi`
+- [ ] `forja nest`
 - [ ] Nginx y GitHub Actions como opciones
+
 
 ## Licencia
 

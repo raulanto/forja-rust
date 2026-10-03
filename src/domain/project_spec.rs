@@ -168,6 +168,40 @@ impl GoHexSpec {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FastApiSpec {
+    pub name: String,
+    pub package_name: String,
+    pub db: DbOption,
+    pub docker: bool,
+    pub auth: bool,
+}
+
+impl FastApiSpec {
+    pub fn new(
+        name: impl Into<String>,
+        db: DbOption,
+        docker: bool,
+        auth: bool,
+    ) -> Result<Self, DomainError> {
+        let name = name.into();
+
+        if name.trim().is_empty() {
+            return Err(DomainError::ProjectName(name.clone()));
+        }
+
+        let package_name = name.trim().replace('-', "_").to_lowercase();
+
+        Ok(Self {
+            name,
+            package_name,
+            db,
+            docker,
+            auth,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -242,5 +276,23 @@ mod tests {
         assert!(spec.is_ok());
         let spec = spec.unwrap();
         assert_eq!(spec.module, "mi_servicio");
+    }
+
+    #[test]
+    fn test_valid_fastapi_spec() {
+        let spec = FastApiSpec::new("mi-api", DbOption::Postgres, true, false);
+        assert!(spec.is_ok());
+        let spec = spec.unwrap();
+        assert_eq!(spec.name, "mi-api");
+        assert_eq!(spec.package_name, "mi_api");
+        assert_eq!(spec.db, DbOption::Postgres);
+        assert!(spec.docker);
+        assert!(!spec.auth);
+    }
+
+    #[test]
+    fn test_invalid_fastapi_project_name() {
+        let spec = FastApiSpec::new("   ", DbOption::Sqlite, false, false);
+        assert_eq!(spec, Err(DomainError::ProjectName("   ".into())));
     }
 }
